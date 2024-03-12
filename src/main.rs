@@ -1,3 +1,4 @@
+use anyhow::Context;
 use axum::{
     http::StatusCode,
     response::IntoResponse,
@@ -5,8 +6,99 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::net::SocketAddr;
+use std::{
+    collections::HashMap,
+    env,
+    sync::{Arc, RwLock},
+};
+use thiserror::Error;
+
+// リポジトリで発生しうるエラーの定義
+#[derive(Debug, Error)]
+enum RepositoryError {
+    #[error("NotFound, id is {0}")]
+    NotFound(i32),
+}
+
+// CRUDの実装をtraitで強制
+// axumでリポジトリを共有するlayer機能を使用するために必要なものを継承
+pub trait TodoRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
+    fn create(&self, payload: CreateTodo) -> Todo;
+    fn find(&self, id: i32) -> Option<Todo>;
+    fn all(&self) -> Vec<Todo>;
+    fn update(&self, id: i32, payload: UpdateTodo) -> anyhow::Result<Todo>;
+    fn delete(&self, id: i32) -> anyhow::Result<()>;
+}
+
+// Todoやそれらの更新に必要なstructを定義
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct Todo {
+    id: i32,
+    text: String,
+    completed: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct CreateTodo {
+    text: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct UpdateTodo {
+    text: Option<String>,
+    completed: Option<bool>,
+}
+
+// instance作成メソッドを定義
+impl Todo {
+    fn new(id: i32, text: String, completed: bool) -> Self {
+        Self {
+            id,
+            text,
+            completed: false,
+        }
+    }
+}
+
+type TodoDatas = HashMap<i32, Todo>;
+
+#[derive(Debug, Clone)]
+pub struct TodoRepositoryForMemory {
+    // データアクセスをスレッドセーフにする
+    // RwLock: 可変参照の場合のスレッドアクセスを1つに制限
+    store: Arc<RwLock<TodoDatas>>,
+}
+
+impl TodoRepositoryForMemory {
+    pub fn new() -> Self {
+        TodoRepositoryForMemory {
+            store: Arc::default(),
+        }
+    }
+}
+
+impl TodoRepository for TodoRepositoryForMemory {
+    fn create(&self, payload: CreateTodo) -> Todo {
+        todo!();
+    }
+
+    fn find(&self, id: i32) -> Option<Todo> {
+        todo!();
+    }
+
+    fn all(&self) -> Vec<Todo> {
+        todo!();
+    }
+
+    fn update(&self, id: i32, payload: UpdateTodo) -> anyhow::Result<Todo> {
+        todo!();
+    }
+
+    fn delete(&self, id: i32) -> anyhow::Result<()> {
+        todo!();
+    }
+}
 
 #[tokio::main]
 async fn main() {
