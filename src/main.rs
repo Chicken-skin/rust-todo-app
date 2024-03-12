@@ -1,5 +1,6 @@
 use anyhow::Context;
 use axum::{
+    extract::Extension,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -66,7 +67,7 @@ type TodoDatas = HashMap<i32, Todo>;
 #[derive(Debug, Clone)]
 pub struct TodoRepositoryForMemory {
     // データアクセスをスレッドセーフにする
-    // RwLock: 可変参照の場合のスレッドアクセスを1つに制限
+    // RwLock: 可変参照の場合のスレッドアクセスを1つに制限(不偏参照の場合は特に制限なし)
     store: Arc<RwLock<TodoDatas>>,
 }
 
@@ -78,6 +79,7 @@ impl TodoRepositoryForMemory {
     }
 }
 
+// todoRepository traitをTodoRepositoryForMemoryに実装
 impl TodoRepository for TodoRepositoryForMemory {
     fn create(&self, payload: CreateTodo) -> Todo {
         todo!();
@@ -107,7 +109,8 @@ async fn main() {
     env::set_var("RUST_LOG", log_level);
     tracing_subscriber::fmt::init();
 
-    let app = create_app();
+    let repository = TodoRepositoryForMemory::new();
+    let app = create_app(repository);
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000)); // 127.0.0.1:3000 (localhost:3000)
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     tracing::debug!("listening on {}", addr);
@@ -120,12 +123,26 @@ async fn main() {
 /// # create_app
 /// This function create app and define routing
 ///
+/// ## argumentation
+/// * repository: something that is impl TodoRepository
+///
 /// ## Return
 /// * app route: Router
-fn create_app() -> Router {
+fn create_app<T: TodoRepository>(reposiotry: T) -> Router {
     Router::new()
         .route("/", get(root))
-        .route("/users", post(create_user))
+        .route("/todos", post(create_todo::<T>))
+        .layer(Extension(Arc::new(reposiotry))) // axumアプリ内でrepositoryを共有できる
+}
+
+// todoを作成
+pub async fn create_todo<T: TodoRepository>(
+    Extension(repository): Extension<Arc<T>>, // 引数の順番になぜか依存がありエラー
+    Json(payload): Json<CreateTodo>,          // Jsonが先に来ているとcompileが通らない
+) -> impl IntoResponse {
+    let todo = repository.create(payload);
+
+    (StatusCode::CREATED, Json(todo))
 }
 
 async fn root() -> &'static str {
@@ -182,8 +199,9 @@ mod test {
     #[tokio::test]
     async fn should_return_hello_world() {
         // request作成
+        let repository = TodoRepositoryForMemory::new();
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = create_app().oneshot(req).await.unwrap();
+        let res = create_app(repository).oneshot(req).await.unwrap();
         let bytes = axum::body::to_bytes(res.into_body(), 128).await.unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
 
@@ -194,13 +212,14 @@ mod test {
     #[tokio::test]
     async fn should_return_user_data() {
         // request作成
+        let repository = TodoRepositoryForMemory::new();
         let req = Request::builder()
             .uri("/users")
             .method(Method::POST)
             .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
             .body(Body::from(r#"{ "username": "Phil Foden" }"#))
             .unwrap();
-        let res = create_app().oneshot(req).await.unwrap();
+        let res = create_app(repository).oneshot(req).await.unwrap();
 
         let bytes = axum::body::to_bytes(res.into_body(), 128).await.unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
