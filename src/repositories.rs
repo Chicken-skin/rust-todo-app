@@ -6,6 +6,7 @@ use std::{
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use validator::{self, Validate};
 
 #[derive(Debug, Error)]
 enum RepositoryError {
@@ -28,8 +29,13 @@ pub struct Todo {
     pub completed: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Validate)]
 pub struct CreateTodo {
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "At least 1 character and less than 100 characters."
+    ))]
     text: String,
 }
 
@@ -40,8 +46,13 @@ impl CreateTodo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Validate)]
 pub struct UpdateTodo {
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "At least 1 character and less than 100 characters."
+    ))]
     text: Option<String>,
     completed: Option<bool>,
 }
