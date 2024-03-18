@@ -6,6 +6,7 @@ use std::{
 use anyhow::Context;
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use thiserror::Error;
 use validator::{self, Validate};
 
@@ -96,6 +97,7 @@ impl TodoRepositoryForMemory {
 
 #[async_trait]
 impl TodoRepository for TodoRepositoryForMemory {
+    // 実行時にエラーになる可能性があるのでanyhow::Result型
     async fn create(&self, payload: CreateTodo) -> anyhow::Result<Todo> {
         let mut store = self.write_store_ref(); // スレッドセーフな書き込み権限ありHashMap
         let id = (store.len() + 1) as i32; // HashMapの長さ+1をidにする(i32)
@@ -137,6 +139,40 @@ impl TodoRepository for TodoRepositoryForMemory {
         let mut store = self.write_store_ref(); // 書き込み権限ありsotre
         store.remove(&id).ok_or(RepositoryError::NotFound(id))?; // idのデータがあればremove
         Ok(()) // 成功すればOkを返す
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TodoRepositoryForDb {
+    pool: PgPool,
+}
+
+impl TodoRepositoryForDb {
+    pub fn new(pool: PgPool) -> Self {
+        TodoRepositoryForDb { pool }
+    }
+}
+
+#[async_trait]
+impl TodoRepository for TodoRepositoryForDb {
+    async fn create(&self, _payload: CreateTodo) -> anyhow::Result<Todo> {
+        todo!()
+    }
+
+    async fn find(&self, _id: i32) -> anyhow::Result<Todo> {
+        todo!()
+    }
+
+    async fn all(&self) -> anyhow::Result<Vec<Todo>> {
+        todo!()
+    }
+
+    async fn update(&self, id: i32, _payload: UpdateTodo) -> anyhow::Result<Todo> {
+        todo!()
+    }
+
+    async fn delete(&self, _id: i32) -> anyhow::Result<()> {
+        todo!()
     }
 }
 
