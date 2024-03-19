@@ -89,5 +89,5 @@ pub async fn delete_todo<T: TodoRepository>(
         .delete(id) // return -> Result<()>
         .await
         .map(|_| StatusCode::NO_CONTENT) // 戻り値のハンドリング
-        .unwrap_or(StatusCode::NOT_FOUND) // 戻り値のハンドリング
+        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR) // 戻り値のハンドリング
 }
