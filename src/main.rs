@@ -9,9 +9,11 @@ use axum::{
 };
 use dotenv::dotenv;
 use handlers::{all_todo, create_todo, delete_todo, find_todo, update_todo};
+use hyper::header::CONTENT_TYPE;
 use sqlx::PgPool;
 use std::net::SocketAddr;
 use std::{env, sync::Arc};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 #[tokio::main]
 async fn main() {
@@ -57,6 +59,12 @@ fn create_app<T: TodoRepository>(reposiotry: T) -> Router {
                 .patch(update_todo::<T>),
         )
         .layer(Extension(Arc::new(reposiotry))) // axumアプリ内でrepositoryを共有できる
+        .layer(
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::exact("http://localhost:3001".parse().unwrap()))
+                .allow_methods(Any)
+                .allow_headers(vec![CONTENT_TYPE]),
+        )
 }
 
 async fn root() -> &'static str {
