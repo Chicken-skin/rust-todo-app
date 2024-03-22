@@ -1,4 +1,4 @@
-pub mod labels;
+pub mod label;
 pub mod todo;
 
 use thiserror::Error;
