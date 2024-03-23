@@ -99,8 +99,6 @@ impl LabelRepository for LabelRepositoryForDb {
 #[cfg(test)]
 #[cfg(feature = "database-test")]
 mod test {
-    use crate::repositories;
-
     use super::*;
     use dotenv::dotenv;
     use sqlx::PgPool;
@@ -139,7 +137,6 @@ mod test {
 
 #[cfg(test)]
 pub mod test_utils {
-    use anyhow::Context;
     use axum::async_trait;
     use std::{
         collections::HashMap,
