@@ -195,4 +195,34 @@ pub mod test_utils {
             Ok(())
         }
     }
+
+    mod test {
+        use std::vec;
+
+        use super::{LabelRepository, LabelRepositoryForMemory};
+        use crate::repositories::label::Label;
+
+        #[tokio::test]
+        async fn label_crud_scenario() {
+            let text = "label text".to_string();
+            let id = 1;
+            let expected = Label::new(id, text.clone());
+
+            // create
+            let repository = LabelRepositoryForMemory::new();
+            let label = repository
+                .create(text.clone())
+                .await
+                .expect("failed label create");
+            assert_eq!(expected, label);
+
+            // all
+            let label = repository.all().await.unwrap();
+            assert_eq!(vec![expected], label);
+
+            // delete
+            let res = repository.delete(id).await;
+            assert!(res.is_ok());
+        }
+    }
 }

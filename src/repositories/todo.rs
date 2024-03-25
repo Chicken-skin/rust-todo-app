@@ -299,7 +299,7 @@ mod test {
                 text: String::from("todo 2"),
                 completed: false,
                 label_id: Some(label_1.id),
-                label_name: Some(label_2.name.clone()),
+                label_name: Some(label_1.name.clone()),
             },
         ];
         let res = fold_entities(rows);
@@ -444,12 +444,12 @@ pub mod test_utils {
     use super::*;
 
     impl TodoEntity {
-        pub fn new(id: i32, text: String) -> Self {
+        pub fn new(id: i32, text: String, labels: Vec<Label>) -> Self {
             Self {
                 id,
                 text,
                 completed: false,
-                labels: vec![],
+                labels,
             }
         }
     }
@@ -465,12 +465,14 @@ pub mod test_utils {
     #[derive(Debug, Clone)]
     pub struct TodoRepositoryForMemory {
         store: Arc<RwLock<TodoDatas>>,
+        labels: Vec<Label>,
     }
 
     impl TodoRepositoryForMemory {
-        pub fn new() -> Self {
+        pub fn new(labels: Vec<Label>) -> Self {
             TodoRepositoryForMemory {
                 store: Arc::default(),
+                labels,
             }
         }
 
@@ -483,6 +485,15 @@ pub mod test_utils {
         fn read_store_ref(&self) -> RwLockReadGuard<TodoDatas> {
             self.store.read().unwrap()
         }
+
+        fn resolve_labels(&self, labels: Vec<i32>) -> Vec<Label> {
+            let mut label_list = self.labels.iter().cloned();
+            let labels = labels
+                .iter()
+                .map(|id| label_list.find(|label| label.id == *id).unwrap())
+                .collect();
+            labels
+        }
     }
 
     #[async_trait]
@@ -491,7 +502,8 @@ pub mod test_utils {
         async fn create(&self, payload: CreateTodo) -> anyhow::Result<TodoEntity> {
             let mut store = self.write_store_ref(); // スレッドセーフな書き込み権限ありHashMap
             let id = (store.len() + 1) as i32; // HashMapの長さ+1をidにする(i32)
-            let todo = TodoEntity::new(id, payload.text.clone()); // Todoインスタンスを新しく作成
+            let labels = self.resolve_labels(payload.labels);
+            let todo = TodoEntity::new(id, payload.text.clone(), labels); // Todoインスタンスを新しく作成
             store.insert(id, todo.clone()); // store(HashMap)に追加
             Ok(todo) // Todoを返すことで、作成されたtodoのidやインスタンスを知れる
         }
@@ -515,7 +527,10 @@ pub mod test_utils {
             let todo = store.get(&id).context(RepositoryError::NotFound(id))?; // idnの値をget. なければNotFoundエラー
             let text = payload.text.unwrap_or(todo.text.clone()); // 引数のtext. なければtodoのtextのclone
             let completed = payload.completed.unwrap_or(todo.completed);
-            let labels = vec![];
+            let labels = match payload.labels {
+                Some(label_ids) => self.resolve_labels(label_ids),
+                None => todo.labels.clone(),
+            };
             // 新しいtodoを作成
             let todo = TodoEntity {
                 id,
@@ -542,14 +557,27 @@ pub mod test_utils {
         async fn todo_crud_scenario() {
             let text = "todo text".to_string();
             let id = 1;
-            let expected = TodoEntity::new(id, text.clone());
+            let label_data = Label {
+                id: 1,
+                name: String::from("test label"),
+            };
+            let labels = vec![label_data.clone()];
+            let expected = TodoEntity {
+                id,
+                text: text.clone(),
+                completed: false,
+                labels: labels.clone(),
+            };
 
             // create
-            todo!("labelデータの追加");
-            let labels = vec![];
-            let repository = TodoRepositoryForMemory::new();
+            let label_data = Label {
+                id: 1,
+                name: String::from("test label"),
+            };
+            let labels = vec![label_data.clone()];
+            let repository = TodoRepositoryForMemory::new(labels.clone());
             let todo = repository
-                .create(CreateTodo::new(text, labels))
+                .create(CreateTodo::new(text, vec![label_data.id]))
                 .await
                 .expect("failed create todo");
             assert_eq!(expected, todo);
